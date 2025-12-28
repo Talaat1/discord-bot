@@ -9,13 +9,44 @@ clean_secret = """ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOi
 # Clean it
 base64_secret = "".join(clean_secret.split())
 
-print("Attempting to restore credentials...")
+print(f"DEBUG: Input length: {len(base64_secret)}")
+decoded_str = None
 
-try:
-    decoded_bytes = base64.b64decode(base64_secret, validate=True)
-    decoded_str = decoded_bytes.decode('utf-8')
-    
-    # Validate JSON
+# Attempt to repair: Try adding padding, or removing trailing chars
+variants = [
+    base64_secret,            # Original
+    base64_secret + "=",      # Add 1
+    base64_secret + "==",     # Add 2
+    base64_secret + "===",    # Add 3
+    base64_secret[:-1],       # Remove 1 (Fixes 3425 -> 3424)
+    base64_secret[:-2]        # Remove 2
+]
+
+for i, variant in enumerate(variants):
+    try:
+        # Pad standard python b64 decode needs correct alignment
+        # but we are manually supplying variants.
+        # We also need to handle the case where variant length isn't mod 4
+        # Python's b64decode throws error if len % 4 != 0
+        
+        # Determine strict padding needed for this variant
+        # If we are brute forcing, we might as well just rely on the b64decode to accept proper 4-byte chunks
+        # Only try if length is multiple of 4?
+        if len(variant) % 4 != 0:
+             continue
+
+        decoded_bytes = base64.b64decode(variant, validate=True)
+        candidate = decoded_bytes.decode('utf-8')
+        
+        # Verify it looks like JSON
+        if candidate.strip().startswith("{") and candidate.strip().endswith("}"):
+             decoded_str = candidate
+             print(f"DEBUG: Success with variant {i}")
+             break
+    except Exception as e:
+        pass
+
+if decoded_str:
     try:
         json_obj = json.loads(decoded_str)
         print("SUCCESS: Decoded valid JSON credentials!")
@@ -25,5 +56,5 @@ try:
         print("SUCCESS: Saved to credentials.json")
     except Exception as e:
         print(f"ERROR: Decoded string was not valid JSON: {e}")
-except Exception as e:
-    print(f"ERROR: Decoding failed: {e}")
+else:
+    print("ERROR: All decode attempts failed. The key might be missing significant chunks.")
