@@ -37,11 +37,13 @@ class SheetsService:
                 print(f"DEBUG: JSON parse error: {e}")
 
             # Decode B64
+            # Robust cleanup: Remove ALL whitespace (spaces, newlines) from the middle of the string
+            b64_str = "".join(raw_val.split())
+            
             # Add padding if needed
-            b64_str = raw_val
             padding = len(b64_str) % 4
             if padding == 1:
-                # Invalid length (1 more than multiple of 4)
+                # Invalid length, but let's try standard padding fix
                 print("Warning: Invalid Base64 length (mod 4 == 1). Attempting to fix...")
                 b64_str += "===" 
             elif padding == 2:
