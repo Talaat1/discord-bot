@@ -21,21 +21,23 @@ class SheetsService:
                 print("Warning: CREDENTIALS_B64 is not set.")
                 return None
             
+            # Check if it's already JSON (starts with {)
+            raw_val = config.CREDENTIALS_B64.strip()
+            if raw_val.startswith('{'):
+                try:
+                    creds_dict = json.loads(raw_val)
+                    return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
+                except:
+                    print("Warning: Looks like JSON but failed to parse. Trying Base64...")
+
             # Decode B64
             # Add padding if needed
-            b64_str = config.CREDENTIALS_B64.strip()
+            b64_str = raw_val
             padding = len(b64_str) % 4
             if padding == 1:
-                # Invalid length (1 more than multiple of 4), likely a missing char or extra char. 
-                # Try adding 3 equals? Or maybe remove 1? 
-                # Usually standard b64 doesn't have remainder 1. 
-                # But let's try standard padding fix.
+                # Invalid length (1 more than multiple of 4)
                 print("Warning: Invalid Base64 length (mod 4 == 1). Attempting to fix...")
-                b64_str += "===" # excessive but maybe works? 
-                # Actually, remainder 1 is impossible in valid b64 unless corrupted.
-                # Remainder 2 needs '=='
-                # Remainder 3 needs '='
-                # But let's just make it robust.
+                b64_str += "===" 
             elif padding == 2:
                 b64_str += "=="
             elif padding == 3:
@@ -46,13 +48,17 @@ class SheetsService:
                 json_str = base64.b64decode(b64_str).decode('utf-8')
             except Exception as e:
                 # Try adding one more padding just in case
-                json_str = base64.b64decode(b64_str + "=").decode('utf-8')
+                try:
+                    json_str = base64.b64decode(b64_str + "=").decode('utf-8')
+                except:
+                    print(f"Failed to decode credentials: {e}")
+                    return None
 
             creds_dict = json.loads(json_str)
             
             return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
         except Exception as e:
-            print(f"Failed to decode credentials: {e}")
+            print(f"Failed to load credentials: {e}")
             return None
 
     async def connect(self):
