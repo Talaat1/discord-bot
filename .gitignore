@@ -13,13 +13,8 @@ venv/
 crash.log
 
 # Secrets/Sensitive
-config.py
-# If config.py contains secrets directly (it loads from env, but safer to ignore if hardcoded changes happen)
-# Wait, user prompt said "Do NOT hardcode any secrets". config.py loads from os.getenv. 
-# However, usually we might commit the scaffolding config.py but NOT if it has defaults.
-# The current config.py assumes env vars. It is safe to commit.
-# But "credentials.json" or similar.
-credentials.json
+# config.py - CAREFUL: Only ignore if you hardcode secrets. Currently uses env vars.
+# credentials.json
 client_secret.json
 
 # IDE
