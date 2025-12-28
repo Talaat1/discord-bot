@@ -23,12 +23,18 @@ class SheetsService:
             
             # Check if it's already JSON (starts with {)
             raw_val = config.CREDENTIALS_B64.strip()
-            if raw_val.startswith('{'):
-                try:
-                    creds_dict = json.loads(raw_val)
-                    return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
-                except:
-                    print("Warning: Looks like JSON but failed to parse. Trying Base64...")
+            print(f"DEBUG: CREDENTIALS_B64 start: '{raw_val[:20]}...'")
+            print(f"DEBUG: Length: {len(raw_val)}")
+
+            # Try parsing as JSON directly first (regardless of start char)
+            try:
+                creds_dict = json.loads(raw_val)
+                print("DEBUG: Successfully parsed as Raw JSON")
+                return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
+            except json.JSONDecodeError:
+                print("DEBUG: Not valid JSON. Attempting Base64...")
+            except Exception as e:
+                print(f"DEBUG: JSON parse error: {e}")
 
             # Decode B64
             # Add padding if needed
