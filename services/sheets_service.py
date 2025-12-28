@@ -37,32 +37,36 @@ class SheetsService:
                 print(f"DEBUG: JSON parse error: {e}")
 
             # Decode B64
-            # Robust cleanup: Remove ALL whitespace (spaces, newlines) from the middle of the string
+            # Robust cleanup: Remove ALL whitespace
             b64_str = "".join(raw_val.split())
             
-            # Add padding if needed
-            padding = len(b64_str) % 4
-            if padding == 1:
-                # Invalid length, but let's try standard padding fix
-                print("Warning: Invalid Base64 length (mod 4 == 1). Attempting to fix...")
-                b64_str += "===" 
-            elif padding == 2:
-                b64_str += "=="
-            elif padding == 3:
-                b64_str += "="
-                
-            # Extra safety: try/except the decode
-            try:
-                json_str = base64.b64decode(b64_str).decode('utf-8')
-            except Exception as e:
-                # Try adding one more padding just in case
+            # Brute force padding (Standard logic failed for some reason)
+            decoded_json = None
+            last_error = None
+            
+            for pad in ["", "=", "==", "==="]:
                 try:
-                    json_str = base64.b64decode(b64_str + "=").decode('utf-8')
+                    current_try = b64_str + pad
+                    decoded_bytes = base64.b64decode(current_try, validate=True) # Validating might be stricter, but try it.
+                    decoded_json = decoded_bytes.decode('utf-8')
+                    # If we got here, it worked!
+                    print(f"DEBUG: Base64 decode successful with padding '{pad}'")
+                    break
+                except Exception as e:
+                    last_error = e
+                    # Continue to next padding
+            
+            if decoded_json is None:
+                print(f"Failed to decode credentials after all attempts. Last error: {last_error}")
+                # Fallback: Try non-validated decode if available or just crash gracefully
+                try:
+                     # One last hail mary: standard b64decode usually handles missing padding if not strict?
+                     # Actually Python's b64decode is strict about length.
+                     return None
                 except:
-                    print(f"Failed to decode credentials: {e}")
                     return None
 
-            creds_dict = json.loads(json_str)
+            creds_dict = json.loads(decoded_json)
             
             return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
         except Exception as e:
