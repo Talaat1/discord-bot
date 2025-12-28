@@ -4,3 +4,4 @@ oauth2client
 aiohttp
 flask
 openpyxl
+# End of requirements (discord-py MUST NOT be here)
