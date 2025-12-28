@@ -7,7 +7,7 @@ class CustomCooldown:
         # 60s cooldown, 1 per bucket
         self.cooldown = commands.CooldownMapping.from_cooldown(1, 60.0, commands.BucketType.user)
 
-    def __call__(self, ctx: discord.ApplicationContext):
+    def __call__(self, ctx: "discord.ApplicationContext"):
         # Admin bypass
         if ctx.user is None or isinstance(ctx.user, discord.User):
             # Probably DM or user not in guild
