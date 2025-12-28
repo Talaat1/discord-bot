@@ -1,0 +1,6 @@
+py-cord
+gspread
+oauth2client
+aiohttp
+flask
+openpyxl
