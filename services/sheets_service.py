@@ -23,12 +23,31 @@ class SheetsService:
             
             # Decode B64
             # Add padding if needed
-            b64_str = config.CREDENTIALS_B64
+            b64_str = config.CREDENTIALS_B64.strip()
             padding = len(b64_str) % 4
-            if padding:
-                b64_str += "=" * (4 - padding)
-            
-            json_str = base64.b64decode(b64_str).decode('utf-8')
+            if padding == 1:
+                # Invalid length (1 more than multiple of 4), likely a missing char or extra char. 
+                # Try adding 3 equals? Or maybe remove 1? 
+                # Usually standard b64 doesn't have remainder 1. 
+                # But let's try standard padding fix.
+                print("Warning: Invalid Base64 length (mod 4 == 1). Attempting to fix...")
+                b64_str += "===" # excessive but maybe works? 
+                # Actually, remainder 1 is impossible in valid b64 unless corrupted.
+                # Remainder 2 needs '=='
+                # Remainder 3 needs '='
+                # But let's just make it robust.
+            elif padding == 2:
+                b64_str += "=="
+            elif padding == 3:
+                b64_str += "="
+                
+            # Extra safety: try/except the decode
+            try:
+                json_str = base64.b64decode(b64_str).decode('utf-8')
+            except Exception as e:
+                # Try adding one more padding just in case
+                json_str = base64.b64decode(b64_str + "=").decode('utf-8')
+
             creds_dict = json.loads(json_str)
             
             return ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)

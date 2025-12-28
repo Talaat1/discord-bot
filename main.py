@@ -18,40 +18,47 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = discord.Bot(intents=intents)
-
 # Services
-sheets_service = SheetsService()
-streak_service = StreakService(sheets_service)
-crash_logger = CrashLogger(sheets_service)
-
-# Global error handler for the bot tree
-@bot.event
-async def on_application_command_error(ctx, error):
-    # Handle cooldown
-    if isinstance(error, discord.ext.commands.CommandOnCooldown):
-        await ctx.respond(str(error), ephemeral=True)
-    elif isinstance(error, discord.ext.commands.MissingRole):
-        await ctx.respond("You do not have permission to use this command.", ephemeral=True)
-    else:
-        # Log unexpected errors
-        print(f"Command Error: {error}")
-        await crash_logger.log_crash(error)
-        await ctx.respond("An error occurred.", ephemeral=True)
-
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
-    
-    # Init sheets connection
-    await sheets_service.connect()
-    print("Sheets service connected.")
+# Services that don't depend on loop can stay global or move in.
+# SheetsService is fine global or local, but safer local to ensure clean state on restart.
+# let's move everything into main to be safe.
 
 async def main():
     try:
         # Start Webserver Thread
         webserver.keep_alive()
+
+        # Initialize Bot inside the loop
+        bot = discord.Bot(intents=intents)
         
+        # Initialize Services
+        sheets_service = SheetsService()
+        streak_service = StreakService(sheets_service)
+        crash_logger = CrashLogger(sheets_service)
+
+        # Global error handler (needs to be attached to the local 'bot')
+        @bot.event
+        async def on_application_command_error(ctx, error):
+            if isinstance(error, discord.ext.commands.CommandOnCooldown):
+                await ctx.respond(str(error), ephemeral=True)
+            elif isinstance(error, discord.ext.commands.MissingRole):
+                await ctx.respond("You do not have permission to use this command.", ephemeral=True)
+            else:
+                print(f"Command Error: {error}")
+                await crash_logger.log_crash(error)
+                await ctx.respond("An error occurred.", ephemeral=True)
+
+        @bot.event
+        async def on_ready():
+            print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+            
+            # Init sheets connection
+            await sheets_service.connect()
+            if sheets_service.client:
+                print("Sheets service connected.")
+            else:
+                print("WARNING: Sheets service FAILED to connect (Check CREDENTIALS_B64).")
+
         # Load Cogs
         bot.add_cog(SchedulerCog(bot, sheets_service))
         bot.add_cog(StreaksCog(bot, streak_service))
@@ -67,33 +74,18 @@ async def main():
     except Exception as e:
         # General Crash Handling
         print("CRITICAL ERROR IN MAIN LOOP")
-        
-        # Log
-        # Use sync logging if loop is dead, but we are in async main, so try async first.
+        # Need access to crash_logger if it exists
         try:
-            await crash_logger.log_crash(e)
+            if 'crash_logger' in locals():
+                await crash_logger.log_crash(e)
+            else:
+                print(f"Crash before logger init: {e}")
         except:
-            crash_logger.log_crash_sync(e)
-
-        # Notify Owner
-        owner_id = config.BOT_OWNER_ID
-        if owner_id:
-            try:
-                # If bot is still capable of fetching user
-                # We need a new session maybe if `bot` is dead? 
-                # `bot` might be closed or closing.
-                # Try simple request if possible? 
-                # "Best effort"
-                pass 
-                # Usually difficult effectively if the loop is crashing. 
-                # But if it's an exception `await bot.start` threw, `bot` might be approachable.
-            except:
-                pass
+            traceback.print_exc()
 
         # Restart
         print("Restarting in 5 seconds...")
         time.sleep(5)
-        # execv
         os.execv(sys.executable, ['python'] + sys.argv)
 
 if __name__ == "__main__":
