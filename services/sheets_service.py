@@ -5,6 +5,7 @@ import json
 import base64
 import config
 from datetime import datetime
+import os
 
 class SheetsService:
     def __init__(self):
@@ -17,8 +18,16 @@ class SheetsService:
     
     def _get_creds(self):
         try:
-            if not config.CREDENTIALS_B64:
-                print("Warning: CREDENTIALS_B64 is not set.")
+            # Priority 1: Local File 'credentials.json' (Bypasses broken env var)
+            if os.path.exists("credentials.json"):
+                print("Found credentials.json, using it...")
+                try:
+                    return ServiceAccountCredentials.from_json_keyfile_name("credentials.json", self.scope)
+                except Exception as e:
+                    print(f"Failed to load credentials.json: {e}")
+
+            if not config.CREDENTIALS_B64:            
+                print("Warning: CREDENTIALS_B64 is not set and credentials.json not found.")
                 return None
             
             # Check if it's already JSON (starts with {)
