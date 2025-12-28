@@ -5,14 +5,6 @@ import time
 import asyncio
 import traceback
 import config
-print(f"DEBUG: Python {sys.version}")
-print(f"DEBUG: discord module: {discord.__file__}")
-print(f"DEBUG: discord version: {discord.__version__}")
-try:
-    print(f"DEBUG: ApplicationContext exists: {hasattr(discord, 'ApplicationContext')}")
-except:
-    pass
-
 import webserver # Keepalive
 from services.sheets_service import SheetsService
 from services.streak_service import StreakService
